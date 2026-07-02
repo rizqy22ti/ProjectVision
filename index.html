@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Diagnosis Penyakit Daun Tanaman - Client Side</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+
+        .gradient-bg {
+            background: linear-gradient(135deg, #1f2937 0%, #115e59 100%);
+        }
+    </style>
+</head>
+
+<body class="bg-slate-50 min-h-screen flex flex-col justify-between">
+
+    <nav class="gradient-bg text-white shadow-xl">
+        <div class="max-w-6xl mx-auto px-4 py-5 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="bg-teal-500 p-2 rounded-xl shadow-md shadow-teal-500/20">
+                    <i class="fa-solid fa-leaf text-xl text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight">FloraDiagnosis (JS Edition)</h1>
+                    <p class="text-xs text-slate-300">Ekstraksi Fitur Gabor Filter & Jaringan Saraf Konvolusional di
+                        Browser</p>
+                </div>
+            </div>
+            <div id="systemStatusBadge"
+                class="text-xs bg-amber-500/20 text-amber-300 border border-amber-500/30 px-3 py-1 rounded-full font-medium flex items-center space-x-1.5 animate-pulse">
+                <div class="w-1.5 h-1.5 bg-amber-400 rounded-full"></div>
+                <span>Memuat Sistem...</span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- CORS Warning Banner (Shown only when opened via file:// protocol) -->
+    <div id="corsWarning" class="hidden bg-rose-50 border-b border-rose-200 py-4 px-6">
+        <div class="max-w-6xl mx-auto flex items-start space-x-3 text-rose-800">
+            <i class="fa-solid fa-triangle-exclamation text-2xl text-rose-600 mt-0.5"></i>
+            <div>
+                <h4 class="font-bold text-sm">Peringatan Keamanan Browser (CORS) Terdeteksi!</h4>
+                <p class="text-xs text-rose-700 mt-1">Anda membuka halaman ini langsung dari file lokal (`file://`).
+                    Browser memblokir pengunduhan file model kecerdasan buatan (`model.json`) secara lokal karena alasan
+                    keamanan.</p>
+                <div class="mt-3 flex flex-col space-y-2">
+                    <p class="text-xs font-semibold">Silakan jalankan server lokal sederhana untuk menggunakan aplikasi
+                        ini:</p>
+                    <div
+                        class="bg-slate-900 text-slate-100 p-2.5 rounded-lg text-xs font-mono select-all w-fit border border-slate-700">
+                        python -m http.server 5000
+                    </div>
+                    <p class="text-xs text-rose-600">Setelah menjalankan perintah tersebut di terminal proyek ini, buka
+                        alamat <a href="http://localhost:5000"
+                            class="underline font-bold hover:text-rose-900">http://localhost:5000</a> di browser Anda.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <main class="max-w-6xl w-full mx-auto px-4 py-8 flex-grow">
+        <!-- System Loading State Card -->
+        <div id="systemLoadingCard" class="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 mb-8 space-y-4">
+            <h3 class="font-bold text-slate-800 text-lg flex items-center">
+                <i class="fa-solid fa-spinner animate-spin text-teal-600 mr-2.5"></i>
+                Memuat Komponen Sistem
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-medium">
+                <div id="opencvStatus"
+                    class="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-slate-600">
+                    <span class="flex items-center"><i class="fa-solid fa-gear mr-2 text-slate-400"></i> OpenCV.js
+                        (Segmentasi Citra & Gabor)</span>
+                    <span class="status-text flex items-center text-amber-500 font-semibold"><i
+                            class="fa-solid fa-circle-notch animate-spin mr-1"></i> Memuat...</span>
+                </div>
+                <div id="modelStatus"
+                    class="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between text-slate-600">
+                    <span class="flex items-center"><i class="fa-solid fa-brain mr-2 text-slate-400"></i> Model CNN
+                        TensorFlow.js</span>
+                    <span class="status-text flex items-center text-amber-500 font-semibold"><i
+                            class="fa-solid fa-circle-notch animate-spin mr-1"></i> Memuat...</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+            <div class="lg:col-span-1 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col h-fit">
+                <h2 class="text-lg font-bold text-slate-800 mb-4 flex items-center">
+                    <i class="fa-solid fa-folder-open mr-2 text-teal-600"></i> Input Sampel Daun
+                </h2>
+
+                <form id="uploadForm" class="space-y-4">
+                    <div class="border-2 border-dashed border-slate-200 hover:border-teal-500 rounded-2xl p-6 text-center cursor-pointer transition-all bg-slate-50/50 relative group"
+                        onclick="document.getElementById('fileInput').click()">
+                        <input type="file" id="fileInput" name="file" accept="image/*" class="hidden"
+                            onchange="previewImage(event)">
+
+                        <div id="dropzoneContent" class="space-y-2">
+                            <i
+                                class="fa-solid fa-images text-4xl text-slate-300 group-hover:text-teal-600 transition-colors"></i>
+                            <p class="text-sm font-medium text-slate-600">Pilih atau seret gambar ke sini</p>
+                            <p class="text-xs text-slate-400">Format yang didukung: JPG, JPEG, PNG</p>
+                        </div>
+
+                        <img id="uploadPreview"
+                            class="hidden max-h-48 mx-auto rounded-xl shadow-md border object-cover">
+                    </div>
+
+                    <button type="submit" id="analyzeBtn" disabled
+                        class="w-full bg-slate-400 cursor-not-allowed text-white font-semibold py-3 px-4 rounded-xl shadow-md transition-all flex items-center justify-center space-x-2">
+                        <i class="fa-solid fa-microscope"></i>
+                        <span>Sistem Belum Siap</span>
+                    </button>
+                </form>
+            </div>
+
+            <div class="lg:col-span-2 flex flex-col space-y-6">
+
+                <div id="loadingState"
+                    class="hidden bg-white p-12 rounded-2xl shadow-sm border border-slate-100 text-center flex-grow flex flex-col items-center justify-center space-y-4">
+                    <div class="animate-spin rounded-full h-12 w-12 border-4 border-teal-600 border-t-transparent">
+                    </div>
+                    <p class="text-sm font-semibold text-slate-700">Mengekstrak Fitur Gabor Filter di WebAssembly...</p>
+                    <p class="text-xs text-slate-400">Menghitung matriks konvolusi citra menggunakan OpenCV.js</p>
+                </div>
+
+                <div id="emptyState"
+                    class="bg-white p-12 rounded-2xl shadow-sm border border-slate-100 text-center flex-grow flex flex-col items-center justify-center space-y-3">
+                    <div class="bg-slate-50 p-4 rounded-full text-slate-300">
+                        <i class="fa-solid fa-chart-pie text-4xl"></i>
+                    </div>
+                    <h3 class="text-base font-semibold text-slate-700">Data Pemeriksaan Kosong</h3>
+                    <p class="text-xs text-slate-400 max-w-sm">Silakan masukkan berkas gambar citra daun pada
+                        kompartemen input di sebelah kiri, kemudian tekan tombol "Jalankan Proses Analisis".</p>
+                </div>
+
+                <div id="resultState" class="hidden space-y-6 flex-grow">
+
+                    <div
+                        class="bg-gradient-to-r from-teal-600 to-emerald-600 rounded-2xl p-6 text-white shadow-lg shadow-teal-600/10">
+                        <p class="text-xs font-semibold tracking-wider uppercase text-teal-100 opacity-90">Kesimpulan
+                            Diagnosis Kerja (TensorFlow.js)</p>
+                        <h3 id="className" class="text-2xl font-bold mt-1 text-white">-</h3>
+
+                        <div class="mt-4 flex items-center space-x-4">
+                            <div class="bg-white/10 px-3 py-1.5 rounded-lg border border-white/10">
+                                <span class="text-xs text-teal-200 block">Nilai Probabilitas</span>
+                                <span id="confidence" class="text-lg font-bold">-</span>
+                            </div>
+                            <div class="flex-grow bg-white/20 h-2 rounded-full overflow-hidden">
+                                <div id="confidenceBar"
+                                    class="bg-white h-full rounded-full transition-all duration-1000" style="width: 0%">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-3">
+                            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center">
+                                <i class="fa-solid fa-camera mr-1.5"></i> 1. Citra Daun Input
+                            </span>
+                            <div
+                                class="aspect-square bg-slate-50 rounded-xl overflow-hidden border border-slate-100 flex items-center justify-center">
+                                <img id="originalImg" class="w-full h-full object-cover" src="" alt="Citra Input">
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 space-y-3">
+                            <span class="text-xs font-bold text-teal-600 uppercase tracking-wider flex items-center">
+                                <i class="fa-solid fa-bezier-curve mr-1.5"></i> 2. Hasil Segmentasi Gabor Filter
+                            </span>
+                            <div
+                                class="aspect-square bg-slate-50 rounded-xl overflow-hidden border border-slate-100 flex items-center justify-center">
+                                <img id="gaborImg" class="w-full h-full object-cover" src="" alt="Ekstraksi Tekstur">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <footer class="bg-white border-t border-slate-100 py-4 text-center text-xs text-slate-400">
+        &copy; Sistem Identifikasi Gejala Patologis Daun Tanaman Hortikultura - Client Side.
+    </footer>
+
+    <!-- TensorFlow.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+
+    <!-- OpenCV.js Setup & Integration -->
+    <script>
+        // Deteksi protokol file://
+        if (window.location.protocol === 'file:') {
+            document.getElementById('corsWarning').classList.remove('hidden');
+        }
+
+        // Variabel penanda kesiapan sistem
+        window.opencvReady = false;
+        window.modelReady = false;
+        let model = null;
+
+        // Daftar kelas penyakit daun (sinkronisasi 100% dengan model)
+        const CLASSES = [
+            "Pepper_bell___Bacterial_spot",                  // Indeks 0
+            "Pepper_bell___healthy",                         // Indeks 1
+            "Potato___Early_blight",                         // Indeks 2
+            "Potato___Late_blight",                          // Indeks 3
+            "Potato___healthy",                              // Indeks 4
+            "Tomato___Late_blight",                          // Indeks 5
+            "Tomato___Early_blight",                         // Indeks 6
+            "Tomato___Bacterial_spot",                       // Indeks 7
+            "Tomato___Leaf_Mold",                            // Indeks 8
+            "Tomato___Septoria_leaf_spot",                    // Indeks 9
+            "Tomato___Spider_mites_Two-spotted_spider_mite", // Indeks 10
+            "Tomato___Target_Spot",                          // Indeks 11
+            "Tomato___Tomato_Yellow_Leaf_Curl_Virus"         // Indeks 12
+        ];
+
+        // OpenCV.js configuration module
+        var Module = {
+            onRuntimeInitialized: function () {
+                console.log('OpenCV.js siap!');
+                window.opencvReady = true;
+
+                // Update UI status OpenCV
+                const ocvStatusEl = document.getElementById('opencvStatus');
+                ocvStatusEl.classList.remove('bg-slate-50', 'border-slate-200');
+                ocvStatusEl.classList.add('bg-emerald-50', 'border-emerald-200', 'text-emerald-800');
+                ocvStatusEl.querySelector('.status-text').innerHTML = '<i class="fa-solid fa-circle-check mr-1"></i> Siap';
+                ocvStatusEl.querySelector('.status-text').classList.replace('text-amber-500', 'text-emerald-600');
+
+                checkSystemReady();
+            }
+        };
+
+        // Fungsi pengecekan kesiapan gabungan
+        function checkSystemReady() {
+            if (window.opencvReady && window.modelReady) {
+                console.log('Semua komponen sistem siap!');
+
+                // Sembunyikan modul loading sistem
+                document.getElementById('systemLoadingCard').classList.add('hidden');
+
+                // Update Badge Navigasi
+                const badge = document.getElementById('systemStatusBadge');
+                badge.classList.remove('bg-amber-500/20', 'text-amber-300', 'border-amber-500/30', 'animate-pulse');
+                badge.classList.add('bg-emerald-500/20', 'text-emerald-300', 'border-emerald-500/30');
+                badge.querySelector('span').innerText = 'Sistem Siap';
+                badge.querySelector('div').classList.replace('bg-amber-400', 'bg-emerald-400');
+
+                // Aktifkan tombol analisis
+                const analyzeBtn = document.getElementById('analyzeBtn');
+                analyzeBtn.disabled = false;
+                analyzeBtn.classList.remove('bg-slate-400', 'cursor-not-allowed');
+                analyzeBtn.classList.add('bg-teal-600', 'hover:bg-teal-700', 'shadow-teal-600/10');
+                analyzeBtn.querySelector('span').innerText = 'Jalankan Proses Analisis';
+            }
+        }
+
+        // Muat model TensorFlow.js secara asinkron
+        async function loadTFModel() {
+            try {
+                // Memuat model dari subfolder static statis
+                model = await tf.loadLayersModel('static/tfjs_model/model.json');
+                console.log('Model TensorFlow.js sukses dimuat!');
+                window.modelReady = true;
+
+                // Update UI status Model
+                const modelStatusEl = document.getElementById('modelStatus');
+                modelStatusEl.classList.remove('bg-slate-50', 'border-slate-200');
+                modelStatusEl.classList.add('bg-emerald-50', 'border-emerald-200', 'text-emerald-800');
+                modelStatusEl.querySelector('.status-text').innerHTML = '<i class="fa-solid fa-circle-check mr-1"></i> Siap';
+                modelStatusEl.querySelector('.status-text').classList.replace('text-amber-500', 'text-emerald-600');
+
+                checkSystemReady();
+            } catch (err) {
+                console.error('Gagal memuat model:', err);
+                const modelStatusEl = document.getElementById('modelStatus');
+                modelStatusEl.querySelector('.status-text').innerHTML = '<i class="fa-solid fa-circle-xmark mr-1"></i> Gagal';
+                modelStatusEl.querySelector('.status-text').classList.replace('text-amber-500', 'text-rose-600');
+            }
+        }
+
+        // Jalankan pemuatan model saat window selesai diload
+        window.addEventListener('load', loadTFModel);
+
+        // Previews image before submit
+        function previewImage(event) {
+            const reader = new FileReader();
+            reader.onload = function () {
+                const output = document.getElementById('uploadPreview');
+                output.src = reader.result;
+                output.classList.remove('hidden');
+                document.getElementById('dropzoneContent').classList.add('hidden');
+            };
+            if (event.target.files[0]) {
+                reader.readAsDataURL(event.target.files[0]);
+            }
+        }
+
+        // --- PREPROCESSING PIPELINE DENGAN OPENCV.JS ---
+        function applyGaborFilter(src) {
+            // 1. Konversi RGBA (dari Canvas) ke BGR agar sama dengan OpenCV Python
+            let bgr = new cv.Mat();
+            cv.cvtColor(src, bgr, cv.COLOR_RGBA2BGR);
+
+            // 2. Konversi ke HSV
+            let hsv = new cv.Mat();
+            cv.cvtColor(bgr, hsv, cv.COLOR_BGR2HSV);
+
+            // 3. Green Masking (Wajib sama persis dengan range di app.py)
+            let lowerGreen = cv.matFromArray(1, 3, cv.CV_64F, [35, 40, 40]);
+            let upperGreen = cv.matFromArray(1, 3, cv.CV_64F, [85, 255, 255]);
+            let plantMask = new cv.Mat();
+            cv.inRange(hsv, lowerGreen, upperGreen, plantMask);
+
+            // 4. Isolasi area daun
+            let segmentedLeaf = new cv.Mat();
+            cv.bitwise_and(bgr, bgr, segmentedLeaf, plantMask);
+
+            // 5. Jalankan Gabor Filter pada gambar grayscale daun
+            let gray = new cv.Mat();
+            cv.cvtColor(segmentedLeaf, gray, cv.COLOR_BGR2GRAY);
+
+            let accum = cv.Mat.zeros(gray.rows, gray.cols, cv.CV_32F);
+
+            // Gabor Setelan Kernel
+            const ksize = 31;
+            const thetas = [0, Math.PI / 4, Math.PI / 2, 3 * Math.PI / 4];
+            const sigmas = [3.0, 5.0];
+            const lamda = Math.PI / 4;
+            const gamma = 0.5;
+            const psi = 0;
+            const w = 15; // (31 - 1) / 2
+
+            let fimg = new cv.Mat();
+            let fimgFloat = new cv.Mat();
+
+            for (let theta of thetas) {
+                for (let sigma of sigmas) {
+                    // Generate Gabor kernel secara manual (karena getGaborKernel absen di OpenCV.js default build)
+                    let kernelVals = new Float32Array(ksize * ksize);
+                    for (let r = 0; r < ksize; r++) {
+                        let y = r - w;
+                        for (let c = 0; c < ksize; c++) {
+                            let x = c - w;
+                            let x_prime = x * Math.cos(theta) + y * Math.sin(theta);
+                            let y_prime = -x * Math.sin(theta) + y * Math.cos(theta);
+                            let val = Math.exp(-(x_prime * x_prime + gamma * gamma * y_prime * y_prime) / (2 * sigma * sigma)) * Math.cos(2 * Math.PI * x_prime / lamda + psi);
+                            kernelVals[r * ksize + c] = val;
+                        }
+                    }
+                    let kernelMat = cv.matFromArray(ksize, ksize, cv.CV_32F, kernelVals);
+
+                    // Konvolusi
+                    cv.filter2D(gray, fimg, cv.CV_8U, kernelMat);
+                    fimg.convertTo(fimgFloat, cv.CV_32F);
+
+                    // Element-wise maximum
+                    cv.max(accum, fimgFloat, accum);
+
+                    kernelMat.delete();
+                }
+            }
+
+            // Normalisasi output ke 8-bit unsigned
+            let gaborOutput = new cv.Mat();
+            accum.convertTo(gaborOutput, cv.CV_8U);
+
+            // 6. Warnai guratan Gabor dengan Jet Color Map secara manual
+            let gaborColored = new cv.Mat(gaborOutput.rows, gaborOutput.cols, cv.CV_8UC3);
+
+            // Precompute Jet lookup table for BGR colors
+            let jetLUT = new Uint8Array(256 * 3);
+            for (let v = 0; v < 256; v++) {
+                let x = v / 255;
+                let r = Math.max(0, Math.min(1, 1.5 - Math.abs(4 * x - 3)));
+                let g = Math.max(0, Math.min(1, 1.5 - Math.abs(4 * x - 2)));
+                let b = Math.max(0, Math.min(1, 1.5 - Math.abs(4 * x - 1)));
+                jetLUT[v * 3] = Math.round(b * 255);     // B
+                jetLUT[v * 3 + 1] = Math.round(g * 255); // G
+                jetLUT[v * 3 + 2] = Math.round(r * 255); // R
+            }
+
+            let gData = gaborOutput.data;
+            let cData = gaborColored.data;
+            let size = gData.length;
+            for (let i = 0; i < size; i++) {
+                let v = gData[i];
+                let idx = i * 3;
+                cData[idx] = jetLUT[v * 3];
+                cData[idx + 1] = jetLUT[v * 3 + 1];
+                cData[idx + 2] = jetLUT[v * 3 + 2];
+            }
+
+            // Masking bagian visualisasi Gabor
+            let gaborLeafOnly = new cv.Mat();
+            cv.bitwise_and(gaborColored, gaborColored, gaborLeafOnly, plantMask);
+
+            // Gabungkan daun asli dengan visualisasi Gabor
+            let combined = new cv.Mat();
+            cv.addWeighted(segmentedLeaf, 0.7, gaborLeafOnly, 0.3, 0, combined);
+
+            // 7. Beri warna Indigo Gelap pada background murni & bagian bercak yang terpotong
+            let bgMask = new cv.Mat();
+            cv.bitwise_not(plantMask, bgMask);
+
+            let bgColored = new cv.Mat(src.rows, src.cols, cv.CV_8UC3);
+            bgColored.setTo(new cv.Scalar(50, 15, 40)); // BGR format: B=50, G=15, R=40
+
+            let bgColoredMasked = new cv.Mat();
+            cv.bitwise_and(bgColored, bgColored, bgColoredMasked, bgMask);
+
+            let finalResult = new cv.Mat();
+            cv.add(combined, bgColoredMasked, finalResult);
+
+            // Bersihkan memori WebAssembly
+            bgr.delete();
+            hsv.delete();
+            lowerGreen.delete();
+            upperGreen.delete();
+            plantMask.delete();
+            segmentedLeaf.delete();
+            gray.delete();
+            accum.delete();
+            fimg.delete();
+            fimgFloat.delete();
+            gaborOutput.delete();
+            gaborColored.delete();
+            gaborLeafOnly.delete();
+            combined.delete();
+            bgMask.delete();
+            bgColored.delete();
+            bgColoredMasked.delete();
+
+            return finalResult;
+        }
+
+        // --- SUBMIT DAN ANALISIS CLIENT-SIDE ---
+        document.getElementById('uploadForm').addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            const fileInput = document.getElementById('fileInput');
+            if (!fileInput.files[0]) {
+                alert('Pilih gambar citra daun terlebih dahulu!');
+                return;
+            }
+
+            // Ganti UI ke mode pemrosesan
+            document.getElementById('emptyState').classList.add('hidden');
+            document.getElementById('resultState').classList.add('hidden');
+            document.getElementById('loadingState').classList.remove('hidden');
+
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+            reader.onload = function (event) {
+                const img = new Image();
+                img.onload = function () {
+                    // Berikan sedikit jeda waktu agar browser sempat menggambar spinner loading
+                    setTimeout(async () => {
+                        try {
+                            // 1. Buat offscreen canvas untuk membaca gambar asli ke OpenCV
+                            let canvasOriginal = document.createElement('canvas');
+                            canvasOriginal.width = img.width;
+                            canvasOriginal.height = img.height;
+                            let ctxOrig = canvasOriginal.getContext('2d');
+                            ctxOrig.drawImage(img, 0, 0);
+
+                            // 2. Baca Mat dari canvas
+                            let src = cv.imread(canvasOriginal);
+
+                            // 3. Jalankan pipeline Gabor Filter
+                            let processedMat = applyGaborFilter(src);
+
+                            // 4. Siapkan visualisasi gambar Gabor untuk ditampilkan
+                            let showMat = new cv.Mat();
+                            cv.cvtColor(processedMat, showMat, cv.COLOR_BGR2RGBA); // Ubah ke RGBA untuk HTML Canvas
+                            let canvasGabor = document.createElement('canvas');
+                            canvasGabor.width = showMat.cols;
+                            canvasGabor.height = showMat.rows;
+                            cv.imshow(canvasGabor, showMat);
+
+                            // Tampilkan gambar asli dan hasil Gabor di UI
+                            document.getElementById('originalImg').src = event.target.result;
+                            document.getElementById('gaborImg').src = canvasGabor.toDataURL('image/jpeg');
+
+                            // 5. Ubah resolusi citra ke 128x128 piksel untuk input model CNN
+                            let resizedMat = new cv.Mat();
+                            let dsize = new cv.Size(128, 128);
+                            cv.resize(processedMat, resizedMat, dsize, 0, 0, cv.INTER_LINEAR);
+
+                            // Konversi ke RGB (warna standar latihan Keras Colab)
+                            let rgbResized = new cv.Mat();
+                            cv.cvtColor(resizedMat, rgbResized, cv.COLOR_BGR2RGB);
+
+                            // 6. Normalisasi piksel ([0..255] -> [0.0..1.0])
+                            let floatData = new Float32Array(128 * 128 * 3);
+                            let matData = rgbResized.data;
+                            for (let i = 0; i < matData.length; i++) {
+                                floatData[i] = matData[i] / 255.0;
+                            }
+
+                            // 7. Ubah data menjadi Tensor TensorFlow.js
+                            let tensor = tf.tensor3d(floatData, [128, 128, 3]);
+                            let inputTensor = tensor.expandDims(0); // Shape [1, 128, 128, 3]
+
+                            // 8. Inferensi Model
+                            let predictionTensor = model.predict(inputTensor);
+                            let predictions = await predictionTensor.data();
+
+                            // Cari kelas probabilitas tertinggi (Argmax)
+                            let maxIdx = 0;
+                            let maxVal = -1;
+                            for (let i = 0; i < predictions.length; i++) {
+                                if (predictions[i] > maxVal) {
+                                    maxVal = predictions[i];
+                                    maxIdx = i;
+                                }
+                            }
+
+                            let confidence = maxVal * 100;
+                            let resultLabel = CLASSES[maxIdx].replace("___", " - ").replace(/_/g, " ");
+
+                            // Tampilkan diagnosa ke UI
+                            document.getElementById('className').innerText = resultLabel;
+                            document.getElementById('confidence').innerText = confidence.toFixed(2) + "%";
+
+                            // Ganti state UI ke hasil diagnosa
+                            document.getElementById('loadingState').classList.add('hidden');
+                            document.getElementById('resultState').classList.remove('hidden');
+
+                            // Animasi progress bar confidence
+                            setTimeout(() => {
+                                document.getElementById('confidenceBar').style.width = confidence.toFixed(2) + '%';
+                            }, 100);
+
+                            // Bersihkan memori (sangat penting untuk WebAssembly dan GPU Tensors)
+                            src.delete();
+                            processedMat.delete();
+                            showMat.delete();
+                            resizedMat.delete();
+                            rgbResized.delete();
+                            // TensorFlow.js tensors menggunakan .dispose(), bukan .delete()
+                            tensor.dispose();
+                            inputTensor.dispose();
+                            predictionTensor.dispose();
+
+                        } catch (err) {
+                            console.error('Error saat analisis citra:', err);
+                            alert('Gagal mendiagnosis gambar: ' + err.message);
+                            document.getElementById('emptyState').classList.remove('hidden');
+                            document.getElementById('loadingState').classList.add('hidden');
+                        }
+                    }, 50);
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+    </script>
+    <!-- Async load OpenCV.js -->
+    <script async src="https://docs.opencv.org/4.5.4/opencv.js" type="text/javascript"></script>
+</body>
+
+</html>
